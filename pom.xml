@@ -10,7 +10,7 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.release>17</maven.compiler.release>
+    <maven.compiler.release>21</maven.compiler.release>
     
     <!-- Local Docker SonarQube Instance -->
     <sonar.host.url>http://localhost:9000</sonar.host.url>
