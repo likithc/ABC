@@ -5,7 +5,7 @@ pipeline {
         IMAGE_NAME     = "student-app"
         IMAGE_TAG      = "${env.BUILD_NUMBER}"
         CONTAINER_NAME = "student-con"
-        SONAR_HOST     = "http://sonarqube:9000" 
+        SONAR_HOST     = "http://your-sonarqube-ip:9000" // Update this line
     }
 
     stages {
@@ -16,44 +16,23 @@ pipeline {
         }
 
         stage('Build & Package') {
-            agent {
-                docker {
-                    image 'maven:3.9.6-eclipse-temurin-21'
-                    // We change the volume mount location to write cleanly to the project workspace instead of container root
-                    args '-v ${WORKSPACE}/.m2:/var/maven/.m2'
-                }
-            }
             steps {
-                // -Duser.home forces Maven to use our writable mount directory
-                sh 'mvn clean package -DskipTests -Duser.home=/var/maven'
+                sh 'mvn clean package -DskipTests'
             }
         }
 
         stage('Run Unit Tests') {
-            agent {
-                docker {
-                    image 'maven:3.9.6-eclipse-temurin-21'
-                    args '-v ${WORKSPACE}/.m2:/var/maven/.m2'
-                }
-            }
             steps {
-                sh 'mvn test -Duser.home=/var/maven'
+                sh 'mvn test'
             }
         }
 
         stage('SonarQube Analysis') {
-            agent {
-                docker {
-                    image 'maven:3.9.6-eclipse-temurin-21'
-                    args '-v ${WORKSPACE}/.m2:/var/maven/.m2'
-                }
-            }
             steps {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                     sh "mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
                         -Dsonar.host.url=${SONAR_HOST} \
-                        -Dsonar.token=${SONAR_TOKEN} \
-                        -Duser.home=/var/maven"
+                        -Dsonar.token=${SONAR_TOKEN}"
                 }
             }
         }
@@ -77,12 +56,6 @@ pipeline {
     post {
         always {
             cleanWs()
-        }
-        success {
-            echo "Pipeline ran successfully!"
-        }
-        failure {
-            echo "Pipeline failed."
         }
     }
 }
