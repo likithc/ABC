@@ -5,7 +5,7 @@ pipeline {
         IMAGE_NAME     = "student-app"
         IMAGE_TAG      = "${env.BUILD_NUMBER}"
         CONTAINER_NAME = "student-con"
-        SONAR_HOST     = "http://sonarqube:9000" // Adjust this to your SonarQube server URL
+        SONAR_HOST     = "http://sonarqube:9000" 
     }
 
     stages {
@@ -19,12 +19,13 @@ pipeline {
             agent {
                 docker {
                     image 'maven:3.9.6-eclipse-temurin-21'
-                    args '-v /var/lib/jenkins/.m2:/root/.m2'
+                    // We change the volume mount location to write cleanly to the project workspace instead of container root
+                    args '-v ${WORKSPACE}/.m2:/var/maven/.m2'
                 }
             }
             steps {
-                // Compiles and packages the app using Java 21 / Maven 3.9 inside the container
-                sh 'mvn clean package -DskipTests'
+                // -Duser.home forces Maven to use our writable mount directory
+                sh 'mvn clean package -DskipTests -Duser.home=/var/maven'
             }
         }
 
@@ -32,11 +33,11 @@ pipeline {
             agent {
                 docker {
                     image 'maven:3.9.6-eclipse-temurin-21'
-                    args '-v /var/lib/jenkins/.m2:/root/.m2'
+                    args '-v ${WORKSPACE}/.m2:/var/maven/.m2'
                 }
             }
             steps {
-                sh 'mvn test'
+                sh 'mvn test -Duser.home=/var/maven'
             }
         }
 
@@ -44,22 +45,21 @@ pipeline {
             agent {
                 docker {
                     image 'maven:3.9.6-eclipse-temurin-21'
-                    args '-v /var/lib/jenkins/.m2:/root/.m2'
+                    args '-v ${WORKSPACE}/.m2:/var/maven/.m2'
                 }
             }
             steps {
-                // Safely injects your SonarQube token credentials configured in Jenkins
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                     sh "mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
                         -Dsonar.host.url=${SONAR_HOST} \
-                        -Dsonar.token=${SONAR_TOKEN}"
+                        -Dsonar.token=${SONAR_TOKEN} \
+                        -Duser.home=/var/maven"
                 }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                // Back on the host machine to wrap the compiled jar into your final image
                 sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
             }
@@ -79,10 +79,10 @@ pipeline {
             cleanWs()
         }
         success {
-            echo "Pipeline built, tested, scanned, and deployed successfully!"
+            echo "Pipeline ran successfully!"
         }
         failure {
-            echo "Pipeline failed. Review the logs above."
+            echo "Pipeline failed."
         }
     }
 }
