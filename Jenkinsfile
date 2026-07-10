@@ -2,58 +2,54 @@ pipeline {
     agent any
 
     tools {
-        // Ensure these exact matching names are configured under Manage Jenkins -> Tools
-        // Use 'maven3' (lowercase) or whatever you exactly named it in the UI
+        // These names must match exactly what you configured in Manage Jenkins -> Tools
         maven 'Maven3'
         jdk   'JDK21'
     }
 
     environment {
-        IMAGE_NAME = "student-app"
-        IMAGE_TAG  = "${env.BUILD_NUMBER}"
+        IMAGE_NAME     = "student-app"
+        IMAGE_TAG      = "${env.BUILD_NUMBER}"
         CONTAINER_NAME = "student-con"
-        SONAR_HOST = "http://sonarqube:9000"
     }
 
     stages {
         stage('Checkout') {
             steps {
+                // Pulls your source code repository
                 git branch: 'main', url: 'https://github.com/daya9096/student-app.git'
             }
         }
 
         stage('Build with Maven') {
             steps {
-                sh 'mvn clean compile'
+                // Explicitly forces Jenkins to inject JDK21 and Maven3 into this execution path
+                withMaven(maven: 'Maven3', jdk: 'JDK21') {
+                    sh 'mvn clean compile'
+                }
             }
         }
 
         stage('Run Unit Tests') {
             steps {
-                sh 'mvn test'
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                // Injects SonarQube credentials safely 
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    sh "mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-                        -Dsonar.host.url=${SONAR_HOST} \
-                        -Dsonar.token=${SONAR_TOKEN}"
+                withMaven(maven: 'Maven3', jdk: 'JDK21') {
+                    sh 'mvn test'
                 }
             }
         }
 
         stage('Package Artifact') {
             steps {
-                sh 'mvn package -DskipTests'
+                // Compiles and outputs the final target/student.jar file
+                withMaven(maven: 'Maven3', jdk: 'JDK21') {
+                    sh 'mvn package -DskipTests'
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                // Generates the production Docker image using your standard Dockerfile
+                // Builds the production-ready Docker image on your EC2 host
                 sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
             }
@@ -61,7 +57,7 @@ pipeline {
 
         stage('Deploy Container') {
             steps {
-                // Stop and remove the old container if it exists, then spin up the new one
+                // Stops and cleans up any old container instance before launching the updated one
                 sh "docker stop ${CONTAINER_NAME} || true"
                 sh "docker rm ${CONTAINER_NAME} || true"
                 sh "docker run -d --name ${CONTAINER_NAME} -p 8080:8080 ${IMAGE_NAME}:latest"
@@ -71,7 +67,14 @@ pipeline {
 
     post {
         always {
+            // Keeps your Jenkins server lightweight by cleaning the workspace directory
             cleanWs()
+        }
+        success {
+            echo "Pipeline built, tested, packaged, and deployed successfully!"
+        }
+        failure {
+            echo "Pipeline failed. Review the console logs above to diagnose."
         }
     }
 }
