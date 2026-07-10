@@ -5,7 +5,7 @@ pipeline {
         IMAGE_NAME     = "student-app"
         IMAGE_TAG      = "${env.BUILD_NUMBER}"
         CONTAINER_NAME = "student-con"
-        SONAR_HOST     = "http://your-sonarqube-ip:9000" // Update this line
+        SONAR_HOST     = "http://18.232.149.101:9000" 
     }
 
     stages {
@@ -56,6 +56,12 @@ pipeline {
     post {
         always {
             cleanWs()
+        }
+        success {
+            echo "Pipeline built, tested, analyzed, and deployed successfully!"
+        }
+        failure {
+            echo "Pipeline failed. Review the logs above."
         }
     }
 }
