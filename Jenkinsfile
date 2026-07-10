@@ -44,24 +44,18 @@ pipeline {
             }
         }
 
-   stage('Deploy Container') {
+        stage('Deploy Container') {
             steps {
                 sh "docker stop ${CONTAINER_NAME} || true"
                 sh "docker rm ${CONTAINER_NAME} || true"
-                // Maps port 8081 on your host to 8080 inside the container
                 sh "docker run -d --name ${CONTAINER_NAME} -p 8081:8080 ${IMAGE_NAME}:latest"
             }
         }
+    }
 
     post {
         always {
             cleanWs()
-        }
-        success {
-            echo "Pipeline built, tested, analyzed, and deployed successfully!"
-        }
-        failure {
-            echo "Pipeline failed. Review the logs above."
         }
     }
 }
